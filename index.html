@@ -199,40 +199,99 @@ async function initMap(){
   renderMapa();
 }
 
+// ── Patrones SVG para múltiples etapas ──────────────────────────────────────
+function ensureDefs(){
+  let defs=document.getElementById('svg-defs');
+  if(!defs){
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.style.cssText='position:absolute;width:0;height:0;overflow:hidden';
+    defs=document.createElementNS('http://www.w3.org/2000/svg','defs');
+    defs.id='svg-defs';
+    svg.appendChild(defs);
+    document.body.insertBefore(svg,document.body.firstChild);
+  }
+  return defs;
+}
+
+function getPatternId(et1,et2){
+  const id=`pat_${et1}_${et2}`;
+  const defs=ensureDefs();
+  if(!document.getElementById(id)){
+    const c1=EC[et1], c2=EC[et2];
+    const pat=document.createElementNS('http://www.w3.org/2000/svg','pattern');
+    pat.setAttribute('id',id);
+    pat.setAttribute('patternUnits','userSpaceOnUse');
+    pat.setAttribute('width','10');
+    pat.setAttribute('height','10');
+    pat.setAttribute('patternTransform','rotate(45)');
+    // Fondo color etapa menor
+    const bg=document.createElementNS('http://www.w3.org/2000/svg','rect');
+    bg.setAttribute('width','10');bg.setAttribute('height','10');bg.setAttribute('fill',c1);
+    // Raya color etapa mayor
+    const line=document.createElementNS('http://www.w3.org/2000/svg','rect');
+    line.setAttribute('x','0');line.setAttribute('y','0');
+    line.setAttribute('width','5');line.setAttribute('height','10');
+    line.setAttribute('fill',c2);line.setAttribute('opacity','0.85');
+    pat.appendChild(bg);pat.appendChild(line);
+    defs.appendChild(pat);
+  }
+  return id;
+}
+
 function renderMapa(){
   if(!map||!MUN_DATA)return;
   if(gl){map.removeLayer(gl);gl=null;}
   const legend=document.getElementById('legend');
   if(!etapas.length){legend.style.display='none';return;}
   legend.style.display='flex';
+
+  // Leyenda: etapas simples + nota de combinación
   legend.innerHTML=etapas.map(et=>`<div class="legend-item"><div class="legend-dot" style="background:${EC[et]}"></div>Etapa ${et} (${ETAPA_HZ[et]})</div>`).join('')+
+    `<div class="legend-item"><div class="legend-dot" style="background:repeating-linear-gradient(45deg,#4f7cff,#4f7cff 3px,#34d399 3px,#34d399 6px)"></div>Múltiples etapas</div>`+
     `<div class="legend-item"><div class="legend-dot" style="background:#1a1d27;border:1px solid #3d4466"></div>Sin afectación</div>`;
+
   gl=L.geoJSON(MUN_DATA,{
     style:f=>{
       const mEt=f.properties.etapas||[];
-      const act=mEt.filter(e=>etapas.includes(e));
+      const act=mEt.filter(e=>etapas.includes(e)).sort((a,b)=>NUMS_ROM.indexOf(a)-NUMS_ROM.indexOf(b));
       if(!act.length)return{fillColor:'#1a1d27',fillOpacity:0.55,color:'#2d3250',weight:0.4};
-      const s=[...act].sort((a,b)=>NUMS_ROM.indexOf(a)-NUMS_ROM.indexOf(b));
-      if(s.length===1)return{fillColor:EC[s[0]],fillOpacity:0.78,color:'#0f1117',weight:0.8};
-      // Múltiples etapas: relleno=etapa menor, borde=etapa mayor, borde grueso
-      return{fillColor:EC[s[0]],fillOpacity:0.78,color:EC[s[s.length-1]],weight:3.5,dashArray:null};
+      if(act.length===1)return{fillColor:EC[act[0]],fillOpacity:0.78,color:'#0f1117',weight:0.8};
+      // Múltiples etapas: patrón SVG rayas
+      const pid=getPatternId(act[0],act[act.length-1]);
+      return{fillColor:'none',fillOpacity:1,fill:true,
+             fillPattern:`url(#${pid})`,
+             color:'#0f1117',weight:0.8};
     },
     onEachFeature:(f,layer)=>{
       const mEt=f.properties.etapas||[];
-      const act=mEt.filter(e=>etapas.includes(e));
-      const n=f.properties.name, dep=f.properties.dep;
+      const act=mEt.filter(e=>etapas.includes(e)).sort((a,b)=>NUMS_ROM.indexOf(a)-NUMS_ROM.indexOf(b));
+      const n=f.properties.name,dep=f.properties.dep;
       if(!act.length){layer.bindTooltip(`<span style="color:#555a7a;font-size:11px">${n}</span>`,{sticky:true});return;}
-      const s=[...act].sort((a,b)=>NUMS_ROM.indexOf(a)-NUMS_ROM.indexOf(b));
       let html=`<b>${n}</b> <span style="color:#8b90b8;font-size:10px">${dep}</span><br>`;
-      s.forEach(et=>html+=`<span style="color:${EC[et]};font-weight:700">Etapa ${et} (${ETAPA_HZ[et]})</span><br>`);
+      act.forEach(et=>html+=`<span style="color:${EC[et]};font-weight:700">Etapa ${et} (${ETAPA_HZ[et]})</span><br>`);
       layer.bindPopup(html);
-      const act2=[...act].sort((a,b)=>NUMS_ROM.indexOf(a)-NUMS_ROM.indexOf(b));
-      const hoverW=act2.length>1?4:2.5, hoverC=act2.length>1?EC[act2[act2.length-1]]:'#fff';
-      layer.on('mouseover',function(){this.setStyle({fillOpacity:0.95,weight:hoverW,color:hoverC});});
+      layer.on('mouseover',function(){this.setStyle({weight:2,color:'rgba(255,255,255,0.6)'});});
       layer.on('mouseout',function(){gl.resetStyle(this);});
+
     }
   }).addTo(map);
+
   map.fitBounds(gl.getBounds(),{padding:[8,8]});
+
+  // Aplicar patrones SVG tras renderizado (necesita un tick para que el DOM esté listo)
+  requestAnimationFrame(()=>{
+    gl.eachLayer(layer=>{
+      const f=layer.feature;
+      if(!f)return;
+      const mEt=f.properties.etapas||[];
+      const act=mEt.filter(e=>etapas.includes(e)).sort((a,b)=>NUMS_ROM.indexOf(a)-NUMS_ROM.indexOf(b));
+      if(act.length>1){
+        const pid=getPatternId(act[0],act[act.length-1]);
+        const el=layer.getElement?layer.getElement():null;
+        if(el)el.setAttribute('fill',`url(#${pid})`);
+      }
+    });
+  });
 }
 
 function buildBtns(id,small){
