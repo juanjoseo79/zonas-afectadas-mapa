@@ -213,7 +213,9 @@ function renderMapa(){
       const act=mEt.filter(e=>etapas.includes(e));
       if(!act.length)return{fillColor:'#1a1d27',fillOpacity:0.55,color:'#2d3250',weight:0.4};
       const s=[...act].sort((a,b)=>NUMS_ROM.indexOf(a)-NUMS_ROM.indexOf(b));
-      return{fillColor:EC[s[0]],fillOpacity:0.78,color:'#0f1117',weight:0.8};
+      if(s.length===1)return{fillColor:EC[s[0]],fillOpacity:0.78,color:'#0f1117',weight:0.8};
+      // Múltiples etapas: relleno=etapa menor, borde=etapa mayor, borde grueso
+      return{fillColor:EC[s[0]],fillOpacity:0.78,color:EC[s[s.length-1]],weight:3.5,dashArray:null};
     },
     onEachFeature:(f,layer)=>{
       const mEt=f.properties.etapas||[];
@@ -224,7 +226,9 @@ function renderMapa(){
       let html=`<b>${n}</b> <span style="color:#8b90b8;font-size:10px">${dep}</span><br>`;
       s.forEach(et=>html+=`<span style="color:${EC[et]};font-weight:700">Etapa ${et} (${ETAPA_HZ[et]})</span><br>`);
       layer.bindPopup(html);
-      layer.on('mouseover',function(){this.setStyle({fillOpacity:0.95,weight:2});});
+      const act2=[...act].sort((a,b)=>NUMS_ROM.indexOf(a)-NUMS_ROM.indexOf(b));
+      const hoverW=act2.length>1?4:2.5, hoverC=act2.length>1?EC[act2[act2.length-1]]:'#fff';
+      layer.on('mouseover',function(){this.setStyle({fillOpacity:0.95,weight:hoverW,color:hoverC});});
       layer.on('mouseout',function(){gl.resetStyle(this);});
     }
   }).addTo(map);
