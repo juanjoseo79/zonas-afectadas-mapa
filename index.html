@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EDCBF — Unidad de Transacciones</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0f1117;font-family:system-ui,-apple-system,sans-serif;color:#e8eaf6;min-height:100vh}
+#app{max-width:720px;margin:0 auto;padding:16px}
+.header{margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #2d3250;display:flex;align-items:center;gap:10px}
+.accent-bar{width:4px;height:36px;background:#4f7cff;border-radius:4px;flex-shrink:0}
+.h-sub{font-size:11px;color:#555a7a;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
+.h-title{font-size:17px;font-weight:700;line-height:1.2}
+.tabs{display:flex;gap:4px;margin-bottom:16px;background:#1a1d27;border-radius:10px;padding:4px;border:1px solid #2d3250}
+.tab{flex:1;padding:8px 6px;border-radius:8px;border:none;cursor:pointer;font-size:12px;transition:all .15s;background:transparent;color:#8b90b8;font-family:inherit}
+.tab.active{background:#1e2235;color:#e8eaf6;font-weight:700}
+.panel{display:none}.panel.active{display:block}
+.card{background:#1e2235;border-radius:10px;padding:14px;border:1px solid #2d3250;margin-bottom:10px}
+.sec-lbl{font-size:10px;font-weight:700;color:#555a7a;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;display:block}
+.etapa-grid{display:flex;flex-wrap:wrap;gap:8px}
+.etapa-btn{padding:7px 0;width:72px;border-radius:8px;border:1px solid #2d3250;cursor:pointer;background:#1a1d27;color:#8b90b8;font-size:12px;font-weight:700;transition:all .15s;font-family:inherit;text-align:center}
+.etapa-btn .hz{font-size:9px;opacity:.7;font-weight:400}
+.etapa-btn.on{background:#2a3a7a;border-color:#4f7cff;color:#8aaeff}
+.clear-btn{font-size:11px;color:#ff6b6b;text-decoration:underline;cursor:pointer;background:none;border:none;font-family:inherit}
+.info-bar{margin-top:8px;font-size:11px;color:#555a7a;display:flex;align-items:center;gap:12px}
+#map{width:100%;height:440px;border-radius:10px;border:1px solid #2d3250;margin-bottom:10px}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;padding:10px 14px;background:#1e2235;border-radius:10px;border:1px solid #2d3250}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:#8b90b8}
+.legend-dot{width:14px;height:14px;border-radius:3px;flex-shrink:0;opacity:.85}
+.tipo-row{display:flex;gap:8px}
+.tipo-btn{flex:1;padding:8px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;border:1px solid #2d3250;background:#1a1d27;color:#8b90b8;transition:all .15s;font-family:inherit}
+.tipo-btn.on{background:#2a3a7a;border-color:#4f7cff;color:#8aaeff}
+.sal-row{display:flex;gap:6px;flex-wrap:wrap}
+.sal-btn{padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;border:1px solid #2d3250;background:#1a1d27;color:#8b90b8;transition:all .15s;font-family:inherit}
+.sal-btn.on{background:#2a3a7a;border-color:#4f7cff;color:#8aaeff;font-weight:700}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+input[type=time],input[type=number],input[type=text],textarea{background:#1a1d27;color:#e8eaf6;border:1px solid #2d3250;border-radius:8px;padding:8px 10px;font-size:13px;width:100%;outline:none;font-family:inherit}
+input:focus,textarea:focus{border-color:#4f7cff}
+textarea{resize:vertical}
+.sw-row{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.sw-row:last-child{margin-bottom:0}
+.switch{width:36px;height:20px;border-radius:20px;cursor:pointer;position:relative;flex-shrink:0;transition:background .2s}
+.switch-knob{position:absolute;width:14px;height:14px;background:#fff;border-radius:50%;top:3px;transition:left .2s}
+.output-box{background:#1a1d27;border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.7;min-height:64px;white-space:pre-wrap;border:1px solid #2d3250;user-select:all;color:#e8eaf6}
+.output-box.empty{color:#555a7a;font-style:italic}
+.copy-btn{width:100%;margin-top:10px;padding:10px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit;border:1px solid #2d3250;background:#1a1d27;color:#8b90b8}
+.copy-btn:disabled{opacity:.4;cursor:not-allowed}
+.copy-btn.ok{border-color:#2dd4a0;background:#0d2e25;color:#2dd4a0}
+.badge{background:#4f7cff;color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:700;margin-left:4px}
+.leaflet-container{background:#0f1117}
+.leaflet-popup-content-wrapper{background:#1e2235;color:#e8eaf6;border:1px solid #2d3250;box-shadow:0 4px 20px #0008}
+.leaflet-popup-tip{background:#1e2235}
+.leaflet-popup-content{font-size:12px;line-height:1.7;margin:10px 14px}
+.leaflet-popup-content b{color:#8aaeff}
+.leaflet-control-zoom a{background:#1e2235 !important;color:#8aaeff !important;border-color:#2d3250 !important}
+.leaflet-control-zoom a:hover{background:#2a3a7a !important}
+.leaflet-control-attribution{background:#1a1d27cc !important;color:#555a7a !important;font-size:9px}
+.leaflet-control-attribution a{color:#4f7cff !important}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <div class="accent-bar"></div>
+    <div>
+      <div class="h-sub">Sistema EDCBF · GOE</div>
+      <div class="h-title">Esquema de Desconexión de Carga por Baja Frecuencia</div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="setTab('mensaje',this)">Redactar mensaje</button>
+    <button class="tab" onclick="setTab('mapa',this)" id="tab-mapa">Mapa de zonas</button>
+    <button class="tab" onclick="setTab('zonas',this)" id="tab-zonas">Tabla de zonas</button>
+  </div>
+
+  <!-- MENSAJE -->
+  <div id="panel-mensaje" class="panel active">
+    <div class="card">
+      <span class="sec-lbl">Tipo de evento</span>
+      <div class="tipo-row">
+        <button class="tipo-btn on" id="btn-regional" onclick="setTipo('regional')">Regional</button>
+        <button class="tipo-btn" id="btn-nacional" onclick="setTipo('nacional')">Nacional</button>
+      </div>
+    </div>
+    <div class="card">
+      <span class="sec-lbl">Saludo inicial</span>
+      <div class="sal-row">
+        <button class="sal-btn on" onclick="setSaludo(this,'')">Sin saludo</button>
+        <button class="sal-btn" onclick="setSaludo(this,'Buenos días, ')">Buenos días</button>
+        <button class="sal-btn" onclick="setSaludo(this,'Buenas tardes, ')">Buenas tardes</button>
+        <button class="sal-btn" onclick="setSaludo(this,'Buenas noches, ')">Buenas noches</button>
+      </div>
+    </div>
+    <div class="card">
+      <span class="sec-lbl">Horario</span>
+      <div class="row2">
+        <div><label class="sec-lbl" style="margin-bottom:4px">Hora del evento</label><input type="time" id="hora-ini" oninput="genMensaje()"></div>
+        <div><label class="sec-lbl" style="margin-bottom:4px">Normalización <span style="text-transform:none;font-weight:400">(opcional)</span></label><input type="time" id="hora-fin" oninput="genMensaje()"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span class="sec-lbl" style="margin-bottom:0">Etapas que operaron</span>
+        <span id="lbl-inyectado" style="font-size:10px;color:#8aaeff;font-weight:600;display:none">Desde mapa/tabla</span>
+      </div>
+      <div class="etapa-grid" id="etapas-msg"></div>
+    </div>
+    <div class="card">
+      <span class="sec-lbl">Carga desconectada</span>
+      <input type="number" id="mw" min="0" placeholder="MW desconectados (opcional)" style="max-width:220px;margin-bottom:12px" oninput="genMensaje()">
+      <div class="sw-row"><div class="switch" id="sw-mex" onclick="toggleSw('mex')"><div class="switch-knob" id="knob-mex" style="left:19px"></div></div><span style="font-size:13px">Disparo interconexión MEX-GUA</span></div>
+      <div class="sw-row"><div class="switch" id="sw-nv" onclick="toggleSw('nv')"><div class="switch-knob" id="knob-nv" style="left:3px"></div></div><span style="font-size:13px">Evento recurrente ("nuevamente")</span></div>
+    </div>
+    <div class="card" id="bloque-regional">
+      <span class="sec-lbl">Origen del evento (opcional)</span>
+      <div class="row2">
+        <div><label class="sec-lbl" style="margin-bottom:4px">País / origen</label><input type="text" id="origen" placeholder="ej. Panamá, Guatemala…" oninput="genMensaje()"></div>
+        <div><label class="sec-lbl" style="margin-bottom:4px">Fuente del dato</label><input type="text" id="fuente" placeholder="ej. EOR" oninput="genMensaje()"></div>
+      </div>
+    </div>
+    <div class="card" id="bloque-nacional" style="display:none">
+      <span class="sec-lbl">Causa del evento</span>
+      <textarea id="causa" rows="2" placeholder="ej. falla en línea 115 kV Soyapango–Santa Ana…" oninput="genMensaje()"></textarea>
+    </div>
+    <div class="card">
+      <span class="sec-lbl">Mensaje generado</span>
+      <div class="output-box empty" id="output">Complete hora del evento y al menos una etapa para generar el mensaje.</div>
+      <button class="copy-btn" id="copy-btn" onclick="copiar()" disabled>Copiar mensaje</button>
+    </div>
+  </div>
+
+  <!-- MAPA -->
+  <div id="panel-mapa" class="panel">
+    <div class="card">
+      <span class="sec-lbl">Seleccionar etapa(s)</span>
+      <div class="etapa-grid" id="etapas-mapa"></div>
+      <div class="info-bar">
+        <span id="mapa-info">Seleccioná una o más etapas</span>
+        <button class="clear-btn" onclick="clearEtapas()">limpiar</button>
+      </div>
+    </div>
+    <div class="legend" id="legend" style="display:none"></div>
+    <div id="map"></div>
+  </div>
+
+  <!-- TABLA -->
+  <div id="panel-zonas" class="panel">
+    <div class="card">
+      <span class="sec-lbl">Seleccionar etapa(s)</span>
+      <div class="etapa-grid" id="etapas-tabla"></div>
+      <div class="info-bar">
+        <span id="tabla-info">Seleccioná una o más etapas</span>
+        <button class="clear-btn" onclick="clearEtapas()">limpiar</button>
+      </div>
+    </div>
+    <div id="tabla-container"></div>
+  </div>
+</div>
+
+<script>
+const ETAPA_HZ={"I":"59.3 Hz","II":"59.1 Hz","III":"58.9 Hz","IV":"58.5 Hz","V":"58.2 Hz","VI":"57.9 Hz"};
+const NUMS_ROM=["I","II","III","IV","V","VI"];
+const DIST=["DELSUR","CAESS","CLESA","EEO"];
+const EC={"I":"#4f7cff","II":"#a78bfa","III":"#34d399","IV":"#fbbf24","V":"#f87171","VI":"#fb923c"};
+const EDCBF_DATA={
+"I":{"DELSUR":"Departamento de San Vicente: sectores poblacionales de Santo Domingo, San Sebastián, San Lorenzo, Verapaz, San Francisco Agua Agria, Guadalupe, sectores poblacionales de San Cayetano Istepeque, Tepetitán, Verapáz.\nDepartamento de Cuscatlán: sectores poblacionales de San Cristóbal.\nDepartamento de La Paz: sectores de Mercedes La Ceiba y Jerusalén.\nDepartamento de La Libertad: sectores poblacionales de San Pablo Tacachico, San Isiro Lempa, y hacia Veracrúz y Buena Vista, Huizucar, Ojos de Agua. Sector de Nuevo Cuscatlán desde colonia 7 de Marzo hasta Huizucar, sectores de cantón Melara, San Diego, San José Villanueva.\nDepartamento de San Salvador: sectores poblacionales de Rosario de Mora, Panchimalco.","CAESS":"Departamento de San Salvador: Boulevard Constitución, Col. Miralvalle y parte de San Antonio Abad, Carretera troncal del norte, Ciudad Delgado.\nDepartamento de Cuscatlán: San Rafael Cedros.\nDepartamento de Chalatenango: Municipios de Chalatenango Centro, Dulce Nombre de María.","CLESA":"Departamento de Santa Ana: Municipio de Metapán, Candelaria de la Frontera, Municipio de Santa Ana.\nDepartamento de Ahuachapán: Atiquizaya, San Lorenzo y Municipio de Ahuachapán.","EEO":"Departamento de La Unión: Municipios de Yayantique, San Alejo, Parte de Santa Rosa de Lima, El Sauce, Boquín, Poloros y Concepción de Oriente.\nDepartamento de San Miguel: Col. Carrillo y cantón Las Delicias."},
+"II":{"DELSUR":"Departamento de San Salvador: sector de Santo Tomás, sectores de Santiago Texacuangos, y sobre ruta panorámica.\nDepartamento de La Paz: sectores de San Luis Talpa y sobre autopista a Comalapa sector de Plaza de Cocos, sectores de San Miguel Tepezontes, San Juan Tepezontes, San Antonio Masahuat, Tapalhuaca, San Pedro Masahuat, El Rosario, Sectores de San Luis La Herradura e Isla La Calzada.\nDepartamento de La Libertad: Sectores de Sitio del Niño, Laguna de Chanmico, cantón de Lomas de Andalucía, El Conacaste, Hacienda San Andrés, Agua Zarca, y cantón Chantusnene.","CAESS":"Departamento de San Salvador: Zona 49 Avenida y Alameda Roosevelt, San Martín (Zona Carretera Panamericana), Tonacatepeque, Barrio San Jacinto y Centro de San Salvador (Calle Antigua Ferrocarril).\nDepartamento de Cuscatlán: San Pedro Perulapán, Santa Cruz Michapa, Suchitoto y San José Guayabal.","CLESA":"Departamento de Ahuachapán: Municipio de Ahuachapán, Metalío y Apancoyo.","EEO":""},
+"III":{"DELSUR":"Departamento de San Salvador: Sectores poblacionales de Chiltiupán, El Carmen, Teotepeque, Jicalapa y Sector de San Francisco Dos Cerros.\nDepartamento de La Libertad: Sectores de colonia Ayicoyo Manuel José Arce, sectores sobre calle a Comasagua, Sector poblacional de Comasagua, cantón El Faro, Nuevo Sacazil, Granadillas, Las Dispensas.\nDepartamento de La Paz: Sector poblacional de Olocuilta, Francisco Chinameca, Cuyultitán, San Juan Talpa, sectores hacia San Luis La Herradura, Comalapa, San Juan Nonualco, Santiago Nonualco, Las Flores, San Rafael Obrajuelo, San Pedro Nonualco, Sectores de San Emigdio, Concepción Lourdes, Paraíso de Osorio, Santa María Ostuma.\nDepartamento de Cuscatlán: sectores poblacionales de Santa Cruz Analquito, San Ramón y Candelaria.","CAESS":"Departamento de San Salvador: Barrio El Centro, Cima de San Bartolo Ilopango y Urb. Metrópolis.","CLESA":"Departamento de Ahuachapán: Municipio de Atiquizaya.","EEO":"Departamento de Morazán: Municipios de Jocoro, San Francisco Gotera, Jocoaitique.\nDepartamento de San Miguel: Municipio de San Miguel Centro, La Estancia, Chapeltique, Ciudad Barrios."},
+"IV":{"DELSUR":"Departamento de San Salvador: Sector residencial Altavista, sectores de Barrio Santa Anita, Colonia Monserrat, Colonia Costa Rica, Colonia 10 de Septiembre, Comunidad La Joya, Colonia Dolores y sectores sobre calle a San Marcos, Sector poblacional de San Marcos y colonias Jardines de San Marcos, Bello San Juan, Bosques de Santorini, San Juan. Zona Franca San Marcos, sobre autopista a Comalapa desde San Marcos hasta Santo Tomás.\nDepartamento de La Libertad: Sector poblacional de Quezaltepeque. Cantones Girón, Platanillos, y calle hacia San Matías y San Ignacio, Sectores poblacionales de Sacacoyo, Tepecoyo, Jayaque, Ateos, Colonia 2 de Mayo, Rio Bajo San José Los Sitios, El Zacamil, Sectores poblacionales de Colón, Lourdes. Sectores de Residenciales Los Chorros, Urbanización Campos Verdes, Miramontes, El Primo, sobre carretera panamericana sectores desde desvío de Opico hasta Parque Industrial Intercomplex.\nDepartamento de La Paz: Sector oeste de Zacatecoluca. Sectores de San Juan Nonualco, San Rafael Obrajuelo, Santiago Nonualco, Sector de boulevard Costa del Sol entre estero El Zanate hasta Isla Palo Blanco y Sector de boulevard Costa del Sol entre Isla Zanate hasta Isla Tasajera.\nDepartamento de San Vicente: sector poblacional de San Vicente, desde parque Antonio José Cañas hacia el norte. Sector de Apastepeque, San Esteban Catarina, Laguna de Apastepeque, San Felipe, San Lázaro, San Lorenzo, Santa Clara, Sebastián Arriba, San Jerónimo y hacia San Ildefonso.","CAESS":"Departamento de San Salvador: Colonia Maquilishuat, Av. Masferrer Norte, Alpes de la Escalón, Residencial Cumbres de Ambrogi, Escalón, Paseo General Escalón, Club Campestre, Plaza Salvador del Mundo, Condominio Miramonte, Colonia El Rosal, Colegio García Flamenco, Metrocentro, Mariona, Los Llanitos, Urbanización Alta Vista 1 y 2, Zona de Ilopango Apulo, Comunidad La Chacra, Comunidad Coro Nuevo San Salvador.","CLESA":"Departamento de Santa Ana: Municipio de Santa Ana (Zona Urbana).","EEO":"Departamento de San Vicente: Municipio de San Lorenzo.\nDepartamento de Usulután: Municipio de Usulután, Santa Anita, Ereguayquín.\nDepartamento de San Miguel: Chinameca, Moncagua y zona de Agua Zarca."},
+"V":{"DELSUR":"Departamento de San Salvador: Sector de Los Planes de Renderos y Panchimalco.\nDepartamento de La Libertad: Sector de Santa Tecla en colonias Santa Mónica, Bosques de Santa Teresa, Jardines de Merliot, Jardines de La Sabana, Urbanizaciones Jardines del Volcán, Jardines de La Libertad, Jardines de Cuscatlán, Jardines de La Hacienda. Sector de El Trébol y Eco-parque El Espino, Sector sobre calle al Volcán, cantón Álvarez, cantón San Juan Los Planes, Ojo de Agua, Cantón El Progreso, Finca Cajamarca, Los Munguía, El Calvario, Las Granadillas.\nDepartamento de La Paz: Sector de Las Isletas, El Achotal, El Pimental, San José Luna y hacia playa San Marcelino, Sectores sobre calle de San Luis Talpa hacia La Zunganera. Playa Amatecampo y El Pimental.","CAESS":"Departamento de Cabañas: Municipio de Ilobasco, San Isidro y Sensuntepeque.\nDepartamento de San Salvador: Cimas de San Bartolo, Cumbres de San Bartolo y Lotificación Los Planes, Colonia El Paraíso, Comunidad San Martín, Comunidad y Urbanización La Chacra parte del Barrio El Centro, Urbanización Cumbres de Miralvalle, Residencial Lomas de San Francisco, Comunidad Monseñor Romero, Colonia Escalón, Nejapa, Lotificación Joyas del Norte, Lotificación Santa Carlota 1 y 2, Caserío Hacienda Mapilapa.","CLESA":"Departamento de Sonsonate: Municipio de Acajutla, Municipio Izalco (Zona Atecozol).","EEO":"Departamento de San Miguel: Municipio de El Delirio y El Tránsito."},
+"VI":{"DELSUR":"Departamento de La Libertad: sobre boulevard Orden de Malta y Luis Poma, sector de avenida del Bosque, Arcos de Santa Elena, Casa Linda, Santa Elena. Sobre carretera panamericana entre boulevard Orden de Malta y Monseñor Romero. Sectores de Santa Tecla colonia Utila, Residencial Primavera, El Carmen, Maya.","CAESS":"Departamento de Cabañas: Sensuntepeque, Ilobasco y Jutiapa.\nDepartamento de Chalatenango: Chalatenango (Zona Sur).\nDepartamento de San Salvador: Cuscatancingo, Mejicanos, Cantón Guadalupe y Los Martínez, Urbanización San Mateo, Residencial Buenos Aires, parte del reparto El Rosal, Colonia 3 de Mayo y parte de colonia Cucumacayán.","CLESA":"","EEO":"Departamento de San Miguel: Municipio de San Miguel Centro y Oeste."}
+};
+
+let etapas=[],saludo="",tipo="regional",sw={mex:true,nv:false},map=null,gl=null,MUN_DATA=null;
+const norm=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+
+function setTab(t,btn){
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('panel-'+t).classList.add('active');
+  if(t==='mapa')initMap();
+  if(t==='zonas')renderTabla();
+}
+
+async function initMap(){
+  if(!map){
+    map=L.map('map',{center:[13.8,-88.9],zoom:8});
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap © CARTO',maxZoom:18}).addTo(map);
+  }
+  if(!MUN_DATA){
+    const r=await fetch('./slv_municipios.geojson');
+    MUN_DATA=await r.json();
+  }
+  renderMapa();
+}
+
+function renderMapa(){
+  if(!map||!MUN_DATA)return;
+  if(gl){map.removeLayer(gl);gl=null;}
+  const legend=document.getElementById('legend');
+  if(!etapas.length){legend.style.display='none';return;}
+  legend.style.display='flex';
+  legend.innerHTML=etapas.map(et=>`<div class="legend-item"><div class="legend-dot" style="background:${EC[et]}"></div>Etapa ${et} (${ETAPA_HZ[et]})</div>`).join('')+
+    `<div class="legend-item"><div class="legend-dot" style="background:#1a1d27;border:1px solid #3d4466"></div>Sin afectación</div>`;
+  gl=L.geoJSON(MUN_DATA,{
+    style:f=>{
+      const mEt=f.properties.etapas||[];
+      const act=mEt.filter(e=>etapas.includes(e));
+      if(!act.length)return{fillColor:'#1a1d27',fillOpacity:0.55,color:'#2d3250',weight:0.4};
+      const s=[...act].sort((a,b)=>NUMS_ROM.indexOf(a)-NUMS_ROM.indexOf(b));
+      return{fillColor:EC[s[0]],fillOpacity:0.78,color:'#0f1117',weight:0.8};
+    },
+    onEachFeature:(f,layer)=>{
+      const mEt=f.properties.etapas||[];
+      const act=mEt.filter(e=>etapas.includes(e));
+      const n=f.properties.name, dep=f.properties.dep;
+      if(!act.length){layer.bindTooltip(`<span style="color:#555a7a;font-size:11px">${n}</span>`,{sticky:true});return;}
+      const s=[...act].sort((a,b)=>NUMS_ROM.indexOf(a)-NUMS_ROM.indexOf(b));
+      let html=`<b>${n}</b> <span style="color:#8b90b8;font-size:10px">${dep}</span><br>`;
+      s.forEach(et=>html+=`<span style="color:${EC[et]};font-weight:700">Etapa ${et} (${ETAPA_HZ[et]})</span><br>`);
+      layer.bindPopup(html);
+      layer.on('mouseover',function(){this.setStyle({fillOpacity:0.95,weight:2});});
+      layer.on('mouseout',function(){gl.resetStyle(this);});
+    }
+  }).addTo(map);
+  map.fitBounds(gl.getBounds(),{padding:[8,8]});
+}
+
+function buildBtns(id,small){
+  const c=document.getElementById(id);c.innerHTML='';
+  NUMS_ROM.forEach(n=>{
+    const b=document.createElement('button');
+    b.className='etapa-btn'+(etapas.includes(n)?' on':'');
+    if(small){b.style.width='48px';b.textContent=n;}
+    else b.innerHTML=`<div>Etapa ${n}</div><div class="hz">${ETAPA_HZ[n]}</div>`;
+    b.onclick=()=>toggle(n);c.appendChild(b);
+  });
+}
+function toggle(n){etapas=etapas.includes(n)?etapas.filter(e=>e!==n):[...etapas,n];refresh();}
+function clearEtapas(){etapas=[];refresh();}
+function refresh(){
+  buildBtns('etapas-mapa');buildBtns('etapas-tabla');buildBtns('etapas-msg',true);
+  renderMapa();renderTabla();genMensaje();
+  const c=etapas.length,b=c?`<span class="badge">${c}</span>`:'';
+  document.getElementById('tab-mapa').innerHTML='Mapa de zonas'+b;
+  document.getElementById('tab-zonas').innerHTML='Tabla de zonas'+b;
+  ['mapa-info','tabla-info'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=c?`${c} etapa${c>1?'s':''} seleccionada${c>1?'s':''}`:'Seleccioná una o más etapas';});
+}
+
+function rzHTML(z){return z.split('\n').map(l=>{const[d,...r]=l.split(':');const rest=r.join(':').trim();return`<div style="margin-bottom:3px"><span style="font-weight:700;color:#8aaeff;font-size:11px">${d.trim()}${rest?':':''}</span>${rest?`<span style="color:#8b90b8;font-size:11px"> ${rest}</span>`:''}</div>`;}).join('');}
+function renderTabla(){
+  const c=document.getElementById('tabla-container');
+  if(!etapas.length){c.innerHTML='';return;}
+  const s=[...etapas].sort((a,b)=>NUMS_ROM.indexOf(a)-NUMS_ROM.indexOf(b));
+  const m=s.length>1;
+  let h=`<div style="border-radius:10px;overflow:auto;border:1px solid #2d3250"><div style="background:#2a3a7a;color:#8aaeff;padding:9px 14px;font-size:12px;font-weight:700;border-bottom:1px solid #2d3250">⚡ ${s.length===1?`Etapa ${s[0]}`:`Etapas ${s.join(' y ')}`} — Zonas afectadas</div><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#21253a"><th style="padding:7px 14px;text-align:left;font-size:9px;color:#555a7a;text-transform:uppercase;width:80px;border-right:1px solid #2d3250">Distribuidor</th>`;
+  if(m)s.forEach(et=>h+=`<th style="padding:7px 10px;text-align:left;font-size:9px;color:#555a7a;text-transform:uppercase;border-right:1px solid #2d3250">Etapa ${et} (${ETAPA_HZ[et]})</th>`);
+  else h+=`<th style="padding:7px 10px;text-align:left;font-size:9px;color:#555a7a;text-transform:uppercase">Zonas — Etapa ${s[0]} (${ETAPA_HZ[s[0]]})</th>`;
+  h+=`</tr></thead><tbody>`;
+  DIST.forEach((dist,ri)=>{
+    if(!s.some(et=>(EDCBF_DATA[et][dist]||'').trim()))return;
+    h+=`<tr style="background:${ri%2===0?'#1a1d27':'#1e2235'};vertical-align:top;border-bottom:1px solid #2d3250"><td style="padding:10px 14px;font-weight:700;color:#8aaeff;font-size:12px;border-right:1px solid #2d3250;white-space:nowrap">${dist}</td>`;
+    if(m)s.forEach(et=>{const t=EDCBF_DATA[et][dist]||'';h+=`<td style="padding:10px;border-right:1px solid #2d3250">${t?rzHTML(t):'<span style="color:#555a7a">—</span>'}</td>`;});
+    else{const t=EDCBF_DATA[s[0]][dist]||'';h+=`<td style="padding:10px">${t?rzHTML(t):''}</td>`;}
+    h+=`</tr>`;
+  });
+  h+=`</tbody></table></div>`;c.innerHTML=h;
+}
+
+function setSaludo(btn,val){saludo=val;document.querySelectorAll('.sal-btn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');genMensaje();}
+function setTipo(t){tipo=t;document.getElementById('btn-regional').className='tipo-btn'+(t==='regional'?' on':'');document.getElementById('btn-nacional').className='tipo-btn'+(t==='nacional'?' on':'');document.getElementById('bloque-regional').style.display=t==='regional'?'':'none';document.getElementById('bloque-nacional').style.display=t==='nacional'?'':'none';genMensaje();}
+function toggleSw(k){sw[k]=!sw[k];document.getElementById('sw-'+k).style.background=sw[k]?'#4f7cff':'#2d3250';document.getElementById('knob-'+k).style.left=sw[k]?'19px':'3px';genMensaje();}
+document.getElementById('sw-mex').style.background='#4f7cff';
+
+function genMensaje(){
+  const hI=document.getElementById('hora-ini').value,hF=document.getElementById('hora-fin').value;
+  const mw=document.getElementById('mw').value,origen=document.getElementById('origen')?.value.trim()||'',fuente=document.getElementById('fuente')?.value.trim()||'',causa=document.getElementById('causa')?.value.trim()||'';
+  const fmt=v=>{if(!v)return'';const[h,m]=v.split(':');return`${h}:${m}`;};
+  const out=document.getElementById('output'),btn=document.getElementById('copy-btn');
+  if(!hI||!etapas.length){out.textContent='Complete hora del evento y al menos una etapa para generar el mensaje.';out.className='output-box empty';btn.disabled=true;return;}
+  const s=[...etapas].sort((a,b)=>NUMS_ROM.indexOf(a)-NUMS_ROM.indexOf(b));
+  const et=s.length===1?'etapa '+s[0]:'etapas '+s.slice(0,-1).join(', ')+' y '+s[s.length-1];
+  const nv=sw.nv?'nuevamente ':'';
+  const ESQ='Esquema de Desconexión de Carga por Baja Frecuencia (EDCBF)';
+  let msg=saludo;
+  if(fmt(hF))msg+=`De las ${fmt(hI)} a ${fmt(hF)} horas, ${nv}operación de ${et} del ${ESQ}`;
+  else msg+=`A las ${fmt(hI)} horas, ${nv}operación de ${et} del ${ESQ}`;
+  if(tipo==='regional'){
+    if(mw)msg+=`, perdiéndose ${mw} MW de carga`;
+    msg+=' por evento regional';
+    if(sw.mex)msg+=' y disparo de interconexión MEX-GUA';
+    msg+='.';
+    if(fmt(hF))msg+=' Carga totalmente recuperada.';
+    else msg+=' Carga todavía fuera a este momento debido a que no se tienen condiciones para normalizarla.';
+    if(origen){msg+=` Origen en ${origen}`;if(fuente)msg+=` según informa ${fuente}`;msg+='.';}
+  }else{
+    if(mw)msg+=`, desconectándose ${mw} MW de demanda en El Salvador`;
+    if(causa)msg+=`, por ${causa}`;
+    if(sw.mex)msg+=(causa||mw)?' y disparo de la interconexión MEX-GUA':', con disparo de la interconexión MEX-GUA';
+    msg+='.';
+    if(fmt(hF))msg+=` Carga normalizada a las ${fmt(hF)} horas.`;
+    else msg+=' Carga todavía fuera a este momento debido a que no se tienen condiciones para normalizarla.';
+  }
+  out.textContent=msg;out.className='output-box';btn.disabled=false;
+}
+function copiar(){navigator.clipboard.writeText(document.getElementById('output').textContent).then(()=>{const b=document.getElementById('copy-btn');b.textContent='✓ Copiado';b.classList.add('ok');setTimeout(()=>{b.textContent='Copiar mensaje';b.classList.remove('ok');},1800);});}
+
+buildBtns('etapas-mapa');buildBtns('etapas-tabla');buildBtns('etapas-msg',true);
+
+</script>
+</body>
+</html>
