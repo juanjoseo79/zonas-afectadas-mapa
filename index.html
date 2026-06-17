@@ -281,12 +281,12 @@ function renderMapa(){
     window._gl2=L.geoJSON(multi,{
       style:f=>{
         const act=(f.properties.etapas||[]).filter(e=>etapas.includes(e)).sort((a,b)=>NUMS_ROM.indexOf(a)-NUMS_ROM.indexOf(b));
-        return{fillColor:EC[act[act.length-1]],fillOpacity:0.42,color:EC[act[act.length-1]],weight:2,dashArray:'5,4'};
+        return{fillColor:EC[act[act.length-1]],fillOpacity:0.25,color:'rgba(255,255,255,0.25)',weight:1,dashArray:'3,4'};
       },
       onEachFeature:(f,layer)=>{
         const act=(f.properties.etapas||[]).filter(e=>etapas.includes(e)).sort((a,b)=>NUMS_ROM.indexOf(a)-NUMS_ROM.indexOf(b));
         layer.bindPopup(mkPopup(f,act));
-        layer.on('mouseover',function(){this.setStyle({fillOpacity:0.62,weight:2.5});});
+        layer.on('mouseover',function(){this.setStyle({fillOpacity:0.38,weight:1.5});});
         layer.on('mouseout',function(){window._gl2.resetStyle(this);});
       }
     }).addTo(map);
