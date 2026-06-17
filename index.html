@@ -241,57 +241,58 @@ function getPatternId(et1,et2){
 function renderMapa(){
   if(!map||!MUN_DATA)return;
   if(gl){map.removeLayer(gl);gl=null;}
+  if(window._gl2){map.removeLayer(window._gl2);window._gl2=null;}
   const legend=document.getElementById('legend');
   if(!etapas.length){legend.style.display='none';return;}
   legend.style.display='flex';
 
-  // Leyenda: etapas simples + nota de combinación
   legend.innerHTML=etapas.map(et=>`<div class="legend-item"><div class="legend-dot" style="background:${EC[et]}"></div>Etapa ${et} (${ETAPA_HZ[et]})</div>`).join('')+
-    `<div class="legend-item"><div class="legend-dot" style="background:repeating-linear-gradient(45deg,#4f7cff,#4f7cff 3px,#34d399 3px,#34d399 6px)"></div>Múltiples etapas</div>`+
+    `<div class="legend-item"><div class="legend-dot" style="background:repeating-linear-gradient(45deg,#4f7cff 0px,#4f7cff 4px,#a78bfa 4px,#a78bfa 8px)"></div>Múltiples etapas</div>`+
     `<div class="legend-item"><div class="legend-dot" style="background:#1a1d27;border:1px solid #3d4466"></div>Sin afectación</div>`;
 
+  const mkPopup=(f,act)=>{
+    const n=f.properties.name,dep=f.properties.dep;
+    let h=`<b>${n}</b> <span style="color:#8b90b8;font-size:10px">${dep}</span><br>`;
+    act.forEach(et=>h+=`<span style="color:${EC[et]};font-weight:700">Etapa ${et} (${ETAPA_HZ[et]})</span><br>`);
+    return h;
+  };
+
+  // Capa base: color de etapa menor activa
   gl=L.geoJSON(MUN_DATA,{
     style:f=>{
-      const mEt=f.properties.etapas||[];
-      const act=mEt.filter(e=>etapas.includes(e)).sort((a,b)=>NUMS_ROM.indexOf(a)-NUMS_ROM.indexOf(b));
+      const act=(f.properties.etapas||[]).filter(e=>etapas.includes(e)).sort((a,b)=>NUMS_ROM.indexOf(a)-NUMS_ROM.indexOf(b));
       if(!act.length)return{fillColor:'#1a1d27',fillOpacity:0.55,color:'#2d3250',weight:0.4};
-      if(act.length===1)return{fillColor:EC[act[0]],fillOpacity:0.78,color:'#0f1117',weight:0.8};
-      // Múltiples etapas: patrón SVG rayas
-      const pid=getPatternId(act[0],act[act.length-1]);
-      return{fillColor:'none',fillOpacity:1,fill:true,
-             fillPattern:`url(#${pid})`,
-             color:'#0f1117',weight:0.8};
+      return{fillColor:EC[act[0]],fillOpacity:0.82,color:'#0f1117',weight:0.7};
     },
     onEachFeature:(f,layer)=>{
-      const mEt=f.properties.etapas||[];
-      const act=mEt.filter(e=>etapas.includes(e)).sort((a,b)=>NUMS_ROM.indexOf(a)-NUMS_ROM.indexOf(b));
-      const n=f.properties.name,dep=f.properties.dep;
-      if(!act.length){layer.bindTooltip(`<span style="color:#555a7a;font-size:11px">${n}</span>`,{sticky:true});return;}
-      let html=`<b>${n}</b> <span style="color:#8b90b8;font-size:10px">${dep}</span><br>`;
-      act.forEach(et=>html+=`<span style="color:${EC[et]};font-weight:700">Etapa ${et} (${ETAPA_HZ[et]})</span><br>`);
-      layer.bindPopup(html);
-      layer.on('mouseover',function(){this.setStyle({weight:2,color:'rgba(255,255,255,0.6)'});});
+      const act=(f.properties.etapas||[]).filter(e=>etapas.includes(e)).sort((a,b)=>NUMS_ROM.indexOf(a)-NUMS_ROM.indexOf(b));
+      if(!act.length){layer.bindTooltip(`<span style="color:#555a7a;font-size:11px">${f.properties.name}</span>`,{sticky:true});return;}
+      layer.bindPopup(mkPopup(f,act));
+      layer.on('mouseover',function(){this.setStyle({fillOpacity:0.95,weight:1.5,color:'rgba(255,255,255,0.4)'});});
       layer.on('mouseout',function(){gl.resetStyle(this);});
-
     }
   }).addTo(map);
 
-  map.fitBounds(gl.getBounds(),{padding:[8,8]});
-
-  // Aplicar patrones SVG tras renderizado (necesita un tick para que el DOM esté listo)
-  requestAnimationFrame(()=>{
-    gl.eachLayer(layer=>{
-      const f=layer.feature;
-      if(!f)return;
-      const mEt=f.properties.etapas||[];
-      const act=mEt.filter(e=>etapas.includes(e)).sort((a,b)=>NUMS_ROM.indexOf(a)-NUMS_ROM.indexOf(b));
-      if(act.length>1){
-        const pid=getPatternId(act[0],act[act.length-1]);
-        const el=layer.getElement?layer.getElement():null;
-        if(el)el.setAttribute('fill',`url(#${pid})`);
+  // Capa overlay: municipios con múltiples etapas — semitransparente del color de etapa mayor + borde punteado
+  const multi={type:'FeatureCollection',features:MUN_DATA.features.filter(f=>{
+    return (f.properties.etapas||[]).filter(e=>etapas.includes(e)).length>1;
+  })};
+  if(multi.features.length){
+    window._gl2=L.geoJSON(multi,{
+      style:f=>{
+        const act=(f.properties.etapas||[]).filter(e=>etapas.includes(e)).sort((a,b)=>NUMS_ROM.indexOf(a)-NUMS_ROM.indexOf(b));
+        return{fillColor:EC[act[act.length-1]],fillOpacity:0.42,color:EC[act[act.length-1]],weight:2,dashArray:'5,4'};
+      },
+      onEachFeature:(f,layer)=>{
+        const act=(f.properties.etapas||[]).filter(e=>etapas.includes(e)).sort((a,b)=>NUMS_ROM.indexOf(a)-NUMS_ROM.indexOf(b));
+        layer.bindPopup(mkPopup(f,act));
+        layer.on('mouseover',function(){this.setStyle({fillOpacity:0.62,weight:2.5});});
+        layer.on('mouseout',function(){window._gl2.resetStyle(this);});
       }
-    });
-  });
+    }).addTo(map);
+  }
+
+  map.fitBounds(gl.getBounds(),{padding:[8,8]});
 }
 
 function buildBtns(id,small){
